@@ -11,6 +11,7 @@ import {HmIPDevice, HmIPGroup, Updateable} from '../HmIPState.js';
 import {HmIPGenericDevice} from './HmIPGenericDevice.js';
 
 interface DimmerChannel {
+    index: number;
     functionalChannelType: string;
     dimLevel: number;
     profileMode: string;
@@ -39,6 +40,13 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
 
 
     this.platform.log.debug(`Created DRD3 dimmer ${accessory.context.device.label}`);
+
+    //remove old Service if service is cached 
+    const oldSr = this.accessory.getService(this.platform.Service.Lightbulb);
+    if (oldSr !== undefined){
+      this.accessory.removeService(oldSr);
+      this.platform.log.info(`remove old srv`);
+    }
 
     this.service[0] = <Service>this.accessory.getServiceById(this.platform.Service.Lightbulb, 'Channel0');
     if (!this.service[0]) {
@@ -204,14 +212,18 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
 
   public updateDevice(hmIPDevice: HmIPDevice, groups: { [key: string]: HmIPGroup }) {
     super.updateDevice(hmIPDevice, groups);
-    let chNumber:number = 0;
+
     for (const id in hmIPDevice.functionalChannels) {
       const channel = hmIPDevice.functionalChannels[id];
       if (channel.functionalChannelType === 'DIMMER_CHANNEL') {
         const dimmerChannel = <DimmerChannel>channel;
         this.platform.log.debug(`Dimmer DRD3 update: ${JSON.stringify(channel)}`);
 
+        const chNumber = dimmerChannel.index - 1;
+
         const brightness = dimmerChannel.dimLevel * 100.0;
+
+
         if (brightness !== null && brightness !== this.brightness[chNumber]) {
           if (this.brightness[chNumber] === 0) {
             this.platform.log.info('Dimmer state %s Channel %d changed to ON', this.accessory.displayName,chNumber);
@@ -225,8 +237,8 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
 
           this.brightness[chNumber] = brightness;
           this.platform.log.debug('Brightness of %s Channel %d changed to %s %%', this.accessory.displayName,chNumber, this.brightness[chNumber].toFixed(0));
-          this.service[chNumber]!.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness);
-          chNumber++;
+          this.service[chNumber]!.updateCharacteristic(this.platform.Characteristic.Brightness, this.brightness[chNumber]);
+          
         }
       }
     }
