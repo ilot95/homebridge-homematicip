@@ -19,6 +19,8 @@ import {HmIPWallMountedThermostat} from './devices/HmIPWallMountedThermostat.js'
 import * as os from 'os';
 import {HmIPSmokeDetector} from './devices/HmIPSmokeDetector.js';
 import {HmIPSwitch} from './devices/HmIPSwitch.js';
+import { HmIPSwitchDRS8 } from './devices/HmIPSwitchDRS8.js';
+import {HmIPSwitchDRS8Single} from './devices/HmIPSwitchDRS8Single.js';
 import {HmIPGarageDoor} from './devices/HmIPGarageDoor.js';
 import {HmIPClimateSensor} from './devices/HmIPClimateSensor.js';
 import {HmIPWaterSensor} from './devices/HmIPWaterSensor.js';
@@ -32,6 +34,7 @@ import {HmIPMotionDetector} from './devices/HmIPMotionDetector.js';
 import {HmIPPresenceDetector} from './devices/HmIPPresenceDetector.js';
 import {HmIPDimmer} from './devices/HmIPDimmer.js';
 import {HmIPDimmerDRD3} from './devices/HmIPDimmerDRD3.js';
+import {HmIPDimmerDRD3Single} from './devices/HmIPDimmerDRD3Single.js';
 import fakegato from 'fakegato-history';
 import {HmIPDoorLockDrive} from './devices/HmIPDoorLockDrive.js';
 import {HmIPDoorLockSensor} from './devices/HmIPDoorLockSensor.js';
@@ -39,6 +42,19 @@ import {HmIPSwitchNotificationLight} from './devices/HmIPSwitchNotificationLight
 import {HmIPWeatherSensor} from './devices/HmIPWeatherSensor.js';
 import {HmIPWeatherSensorPlus} from './devices/HmIPWeatherSensorPlus.js';
 import {HmIPWeatherSensorPro} from './devices/HmIPWeatherSensorPro.js';
+
+
+
+type MultiMap<KEY, VALUE> = Map<KEY, Array<VALUE>>;
+
+function mmAdd<KEY, VALUE>(mm: MultiMap<KEY, VALUE>, key: KEY, value: VALUE) {
+    const values = mm.get(key);
+    if (values === undefined) {
+        mm.set(key, [value]);
+    } else {
+        values.push(value);
+    }
+}
 
 /**
  * HomematicIP platform
@@ -53,7 +69,9 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
 
   public readonly connector: HmIPConnector;
   public groups!: { [key: string]: HmIPGroup };
-  private deviceMap = new Map();
+  //private deviceMap = new Map();
+  public deviceMap: MultiMap<string, HmIPGenericDevice> = new Map();
+
   public customCharacteristic: CustomCharacteristic;
 
   public securitySystem: HmIPSecuritySystem | undefined;
@@ -216,14 +234,21 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
           case 'DEVICE_REMOVED':
             if (event.device) {
               this.log.debug(`${event.pushEventType}: ${event.device.id} ${event.device.modelType}`);
-              const hmIPDevice: HmIPGenericDevice | null = this.deviceMap.get(event.device.id);
-              if (hmIPDevice) {
-                this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [hmIPDevice.accessory]);
-                delete hmIPState.devices[event.device.id];
-                this.deviceMap.delete(event.device.id);
-              } else {
-                this.log.debug('Removal event from unregistered device: ' + event.device.id);
+
+              const hmIPDevices: HmIPGenericDevice []| undefined = this.deviceMap.get(event.device.id);
+              if(hmIPDevices != undefined){
+                for (let hmIPDevice of hmIPDevices) {
+                  if (hmIPDevice) {
+                    this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [hmIPDevice.accessory]);
+                    delete hmIPState.devices[event.device.id];
+                    this.deviceMap.delete(event.device.id);
+                  } else {
+                    this.log.debug('Removal event from unregistered device: ' + event.device.id);
+                  }
               }
+              }
+
+              
             }
             break;
           case 'DEVICE_CHANGED':
@@ -231,7 +256,20 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
             if (event.device) {
               this.log.debug(`${event.pushEventType}: ${event.device.id} ${event.device.modelType}`);
               if (this.deviceMap.has(event.device.id)) {
-                (<Updateable>this.deviceMap.get(event.device.id)).updateDevice(event.device, this.groups);
+
+                //(<Updateable>this.deviceMap.get(event.device.id)).updateDevice(event.device, this.groups);
+
+                const hmIPDevices: HmIPGenericDevice []| undefined = this.deviceMap.get(event.device.id);
+
+                if(hmIPDevices != undefined){
+                  for (let hmIPDevice of hmIPDevices) {
+                    if (hmIPDevice) {
+                      (<Updateable><unknown>hmIPDevice).updateDevice(event.device, this.groups);
+                    }
+                  }
+                }
+
+
               } else {
                 this.log.debug('Device add/change event from unregistered device: ' + event.device.id);
               }
@@ -293,9 +331,67 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
       || device.type === 'PRINTED_CIRCUIT_BOARD_SWITCH_2' // Only first channel
       || device.type === 'OPEN_COLLECTOR_8_MODULE' // Only first channel
       || device.type === 'HEATING_SWITCH_2' // Only first channel
-      || device.type === 'WIRED_SWITCH_8' // Only first channel
+      //|| device.type === 'WIRED_SWITCH_8' // Only first channel
       || device.type === 'DIN_RAIL_SWITCH_4') { // Only first channel
       homebridgeDevice = new HmIPSwitch(this, hmIPAccessory.accessory);
+    } else if (device.type === 'WIRED_SWITCH_8'
+      || device.type === 'OPEN_COLLECTOR_8_MODULE'
+    ) {
+
+      
+
+      
+      const uuidch0 = this.api.hap.uuid.generate(id + 0);
+      const hmIPAccessorych0 = this.createAccessory(uuidch0, device.label + " ch0", device);
+      let homebridgeDevicech0: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych0.accessory,0);
+      mmAdd(this.deviceMap, id, homebridgeDevicech0);
+      hmIPAccessorych0.register();
+
+      const uuidch1 = this.api.hap.uuid.generate(id + 1);
+      const hmIPAccessorych1 = this.createAccessory(uuidch1, device.label + " ch1", device);
+      let homebridgeDevicech1: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych1.accessory,1);
+      mmAdd(this.deviceMap, id, homebridgeDevicech1);
+      hmIPAccessorych1.register();
+
+      const uuidch2 = this.api.hap.uuid.generate(id + 2);
+      const hmIPAccessorych2 = this.createAccessory(uuidch2, device.label + " ch2", device);
+      let homebridgeDevicech2: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych2.accessory,2);
+      mmAdd(this.deviceMap, id, homebridgeDevicech2);
+      hmIPAccessorych2.register();
+
+      const uuidch3 = this.api.hap.uuid.generate(id + 3);
+      const hmIPAccessorych3 = this.createAccessory(uuidch3, device.label + " ch3", device);
+      let homebridgeDevicech3: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych3.accessory,3);
+      mmAdd(this.deviceMap, id, homebridgeDevicech3);
+      hmIPAccessorych3.register();
+
+      const uuidch4 = this.api.hap.uuid.generate(id + 4);
+      const hmIPAccessorych4 = this.createAccessory(uuidch4, device.label + " ch4", device);
+      let homebridgeDevicech4: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych4.accessory,4);
+      mmAdd(this.deviceMap, id, homebridgeDevicech4);
+      hmIPAccessorych4.register();
+
+      const uuidch5 = this.api.hap.uuid.generate(id + 5);
+      const hmIPAccessorych5 = this.createAccessory(uuidch5, device.label + " ch5", device);
+      let homebridgeDevicech5: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych5.accessory,5);
+      mmAdd(this.deviceMap, id, homebridgeDevicech5);
+      hmIPAccessorych5.register();
+
+      const uuidch6 = this.api.hap.uuid.generate(id + 6);
+      const hmIPAccessorych6 = this.createAccessory(uuidch6, device.label + " ch6", device);
+      let homebridgeDevicech6: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych6.accessory,6);
+      mmAdd(this.deviceMap, id, homebridgeDevicech6);
+      hmIPAccessorych6.register();
+
+      const uuidch7 = this.api.hap.uuid.generate(id + 7);
+      const hmIPAccessorych7 = this.createAccessory(uuidch7, device.label + " ch7", device);
+      let homebridgeDevicech7: HmIPGenericDevice  = new HmIPSwitchDRS8Single(this, hmIPAccessorych7.accessory,7);
+      mmAdd(this.deviceMap, id, homebridgeDevicech7);
+      hmIPAccessorych7.register();
+      
+
+      return;
+
     } else if ( device.type === 'PLUGABLE_SWITCH_MEASURING'
       || device.type === 'BRAND_SWITCH_MEASURING'
       || device.type === 'FULL_FLUSH_SWITCH_MEASURING') {
@@ -318,7 +414,29 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
       || device.type === 'PLUGGABLE_DIMMER') { 
       homebridgeDevice = new HmIPDimmer(this, hmIPAccessory.accessory);
     } else if (device.type === 'WIRED_DIMMER_3') {
-      homebridgeDevice = new HmIPDimmerDRD3(this, hmIPAccessory.accessory);
+
+       
+      const uuidch0 = this.api.hap.uuid.generate(id + 0);
+      const hmIPAccessorych0 = this.createAccessory(uuidch0, device.label + " ch0", device);
+      let homebridgeDevicech0: HmIPGenericDevice  = new HmIPDimmerDRD3Single(this, hmIPAccessorych0.accessory,0);
+      mmAdd(this.deviceMap, id, homebridgeDevicech0);
+      hmIPAccessorych0.register();
+
+      const uuidch1 = this.api.hap.uuid.generate(id + 1);
+      const hmIPAccessorych1 = this.createAccessory(uuidch1, device.label + " ch1", device);
+      let homebridgeDevicech1: HmIPGenericDevice  = new HmIPDimmerDRD3Single(this, hmIPAccessorych1.accessory,1);
+      mmAdd(this.deviceMap, id, homebridgeDevicech1);
+      hmIPAccessorych1.register();
+
+      const uuidch2 = this.api.hap.uuid.generate(id + 2);
+      const hmIPAccessorych2 = this.createAccessory(uuidch2, device.label + " ch2", device);
+      let homebridgeDevicech2: HmIPGenericDevice  = new HmIPDimmerDRD3Single(this, hmIPAccessorych2.accessory,2);
+      mmAdd(this.deviceMap, id, homebridgeDevicech2);
+      hmIPAccessorych2.register();
+      
+      return
+     
+      
     } else if (device.type === 'DOOR_LOCK_DRIVE') {
       homebridgeDevice = new HmIPDoorLockDrive(this, hmIPAccessory.accessory);
     } else if (device.type === 'DOOR_LOCK_SENSOR') {
@@ -337,7 +455,10 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
     }
 
     if (!homebridgeDevice.hidden) {
-      this.deviceMap.set(id, homebridgeDevice);
+
+      //this.deviceMap.set(id, homebridgeDevice);
+      mmAdd(this.deviceMap, id, homebridgeDevice);
+
       hmIPAccessory.register();
     }
   }
@@ -372,7 +493,12 @@ export class HmIPPlatform implements DynamicPlatformPlugin {
     const securitySystem = new HmIPSecuritySystem(this, hmIPAccessory.accessory);
 
     if (!securitySystem.hidden) {
-      this.deviceMap.set(id, securitySystem);
+
+      //todo fix this 
+      //this.deviceMap.set(id, securitySystem);
+
+      //mmAdd(this.deviceMap, id, securitySystem);
+
       hmIPAccessory.register();
     }
 

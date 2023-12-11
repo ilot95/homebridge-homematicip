@@ -29,7 +29,7 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
 
   private service: (Service | undefined) [] = [undefined,undefined,undefined];
 
-  private brightness: number [] = [ 0, 0, 0];
+  private brightness: number [] = [0, 0, 0];
 
 
   constructor(
@@ -45,7 +45,7 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
     const oldSr = this.accessory.getService(this.platform.Service.Lightbulb);
     if (oldSr !== undefined){
       this.accessory.removeService(oldSr);
-      this.platform.log.info(`remove old srv`);
+      this.platform.log.info(`remove old cached service`);
     }
 
     this.service[0] = <Service>this.accessory.getServiceById(this.platform.Service.Lightbulb, 'Channel0');
@@ -78,9 +78,6 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
       }
     } 
 
-
-    //is this line needed?
-    //this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.label);
 
     this.service[0].getCharacteristic(this.platform.Characteristic.On)
       .on('get', this.handleOnGetCh0.bind(this))
@@ -135,7 +132,7 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
   }
 
   async handleBrightnessSetCh0(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-    this.platform.log.info('Setting brightness Channel 0  of %s to %s %%', this.accessory.displayName, value);
+    this.platform.log.info('Setting brightness Channel 0 of %s to %s %%', this.accessory.displayName, value);
     const body = {
       channelIndex: 1,
       deviceId: this.accessory.context.device.id,
@@ -144,9 +141,6 @@ export class HmIPDimmerDRD3 extends HmIPGenericDevice implements Updateable {
     await this.platform.connector.apiCall('device/control/setDimLevel', body);
     callback(null);
   }
-
-
-
 
 
   handleOnGetCh1(callback: CharacteristicGetCallback) {

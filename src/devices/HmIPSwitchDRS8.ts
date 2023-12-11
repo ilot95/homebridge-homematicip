@@ -20,21 +20,13 @@ interface SwitchChannel {
 /**
  * HomematicIP switch
  *
- * Switches
- *
- * HMIP-PS (Pluggable Switch)
- * HMIP-PCBS (Switch Circuit Board - 1 channel)
- * HMIP-PCBS-BAT (Printed Circuit Board Switch Battery)
- * HMIP-PCBS2 (Switch Circuit Board - 2x channels)
- * HMIP-MOD-OC8 ( Open Collector Module )
- * HMIP-WHS2 (Switch Actuator for heating systems – 2x channels)
- * HMIP-DRSI4 (Homematic IP Switch Actuator for DIN rail mount – 4x channels) """
+ * HMIPW-DRS8 (Homematic IP Wired Switch Actuator – 8x channels)
  *
  */
-export class HmIPSwitch extends HmIPGenericDevice implements Updateable {
-  private service: Service;
+export class HmIPSwitchDRS8 extends HmIPGenericDevice implements Updateable {
+  //private service: Service;
 
-  private on = false;
+  //private on = false;
 
   constructor(
     platform: HmIPPlatform,
@@ -42,7 +34,15 @@ export class HmIPSwitch extends HmIPGenericDevice implements Updateable {
   ) {
     super(platform, accessory);
 
-    this.platform.log.debug(`Created switch ${accessory.context.device.label}`);
+    this.platform.log.debug(`fake Created switch DRS8 ${accessory.context.device.label}`);
+
+    const srv = this.accessory.getService(this.platform.Service.Switch)
+
+    if (srv !== undefined){
+      this.accessory.removeService(srv);
+      this.platform.log.info(`remove old srv DRS8`);
+    }
+    /*
     this.service = this.accessory.getService(this.platform.Service.Switch) || this.accessory.addService(this.platform.Service.Switch);
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.label);
 
@@ -51,8 +51,10 @@ export class HmIPSwitch extends HmIPGenericDevice implements Updateable {
     this.service.getCharacteristic(this.platform.Characteristic.On)
       .on('get', this.handleOnGet.bind(this))
       .on('set', this.handleOnSet.bind(this));
+    */
   }
 
+  /*
   handleOnGet(callback: CharacteristicGetCallback) {
     callback(null, this.on);
   }
@@ -67,9 +69,11 @@ export class HmIPSwitch extends HmIPGenericDevice implements Updateable {
     await this.platform.connector.apiCall('device/control/setSwitchState', body);
     callback(null);
   }
+  */
 
   public updateDevice(hmIPDevice: HmIPDevice, groups: { [key: string]: HmIPGroup }) {
     super.updateDevice(hmIPDevice, groups);
+    /*
     for (const id in hmIPDevice.functionalChannels) {
       const channel = hmIPDevice.functionalChannels[id];
       if (channel.functionalChannelType === 'SWITCH_CHANNEL') {
@@ -81,8 +85,9 @@ export class HmIPSwitch extends HmIPGenericDevice implements Updateable {
           this.platform.log.info('Switch state of %s changed to %s', this.accessory.displayName, this.on ? 'ON' : 'OFF');
           this.service.updateCharacteristic(this.platform.Characteristic.On, this.on);
         }
-      }
+      } 
     }
+    */
   }
 
 }
